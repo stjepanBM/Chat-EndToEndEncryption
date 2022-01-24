@@ -9,9 +9,8 @@ from Crypto.PublicKey import RSA
 from lazyme.string import color_print
 
 
-
 def RemovePadding(s):
-    return s.replace('`','')
+    return s.replace(b'`',b'')
 
 
 def Padding(s):
@@ -104,9 +103,9 @@ def ConnectionSetup():
                         clientMsg = client.recv(2048).decode()
                         CONNECTION_LIST.append((clientMsg, client))
                         color_print("\n" + clientMsg + " IS CONNECTED", color="green", underline=True)
-                        threading_client = threading.Thread(target=broadcast_usr, args=[clientMsg, client, AESKey])
+                        threading_client = threading.Thread(target=broadcast_usr, args=[clientMsg, client, key_128])
                         threading_client.start()
-                        threading_message = threading.Thread(target=send_message, args=[client, AESKey])
+                        threading_message = threading.Thread(target=send_message, args=[client, key_128])
                         threading_message.start()
                     else:
                         color_print("\nSession key from client does not match", color="red", underline=True)
@@ -116,32 +115,35 @@ def ConnectionSetup():
 
 
 def send_message(socketClient, AESk):
+    new_ser = AES.new(AESk, AES.MODE_CBC, IV = AESk)
     while True:
         msg = input("\n Enter your message: ")
-        en = AESk.encrypt(Padding(msg))
-        socketClient.send(en)
+        en = new_ser.encrypt(Padding(msg).encode())
         if msg == FLAG_QUIT:
             os.kill(os.getpid(), signal.SIGKILL)
         else:
-            color_print("\n[!] Your encrypted message \n" + en, color="gray")
+            color_print("\n[!] Your encrypted message \n" + en.decode('latin-1'), color="gray")
+        socketClient.send(en)
+
 
 
 def broadcast_usr(uname, socketClient, AESk):
+    new_broad = AES.new(AESk, AES.MODE_CBC, IV = AESk)
     while True:
         try:
-            data = socketClient.recv(1024).decode()
-            en = data
+            data = socketClient.recv(1024)
             if data:
-                data = RemovePadding(AESk.decrypt(data))
+                en = RemovePadding(new_broad.decrypt(data))
                 if data == FLAG_QUIT:
                     color_print("\n" + uname + " left the conversation", color="red", underline=True)
                 else:
                     b_usr(socketClient, uname, data)
-                    print("\n[!] ", uname, " SAID : ", data)
-                    color_print("\n[!] Client's encrypted message\n" + en, color="gray")
+                    print("\n[!] ", uname, " SAID : ", en.decode('latin-1'))
+                    color_print("\n[!] Client's encrypted message\n" +data.decode('latin-1') , color="gray")
+
         except Exception as x:
             print(x)
-            break
+
 
 
 def b_usr(cs_sock, sen_name, msg):

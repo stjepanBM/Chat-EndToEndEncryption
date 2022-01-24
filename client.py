@@ -45,27 +45,33 @@ def encrypt_key(key, msg):
         print(e)
 
 
-def ReceiveMessage():
+def ReceiveMessage(socketClient, AESKey):
+    new_dec = AES.new(AESKey, AES.MODE_CBC, IV = AESKey)
     while True:
         emsg = server.recv(1024)
-        msg = RemovePadding(AESKey.decrypt(emsg))
+        msg = RemovePadding(new_dec.decrypt(emsg))
         if msg == FLAG_QUIT:
             color_print("\n[!] Server was shutdown by admin", color="red", underline=True)
             os.kill(os.getpid(), signal.SIGKILL)
         else:
-            color_print("\n[!] Server's encrypted message \n" + emsg.decode(), color="gray")
-            print("\n[!] SERVER SAID : ", msg)
+            color_print("\n[!] Server's encrypted message \n" + emsg.decode('latin-1'), color="gray")
+            print("\n[!] SERVER SAID : ", msg.decode('latin-1'))
 
 
-def SendMessage():
+
+
+def SendMessage(socketClient, AESKey):
+    new_aes = AES.new(AESKey,AES.MODE_CBC, IV = AESKey)
     while True:
-        msg = input("[>] Your message")
-        en = AESKey.encrypt(Padding(msg))
-        server.send(str(en))
-        if msg == FLAG_QUIT:
+        msg_send = input("[>] Your message: ")
+        en = new_aes.encrypt(Padding(msg_send).encode())
+        if msg_send == FLAG_QUIT:
             os.kill(os.getpid(), signal.SIGKILL)
         else:
-            color_print("\n[!] Your encrypted message \n" + en.decode(), color="gray")
+            color_print("\n[!] Your encrypted message \n" + msg_send, color="gray")
+        server.send(en)
+
+
 
 
 if __name__ == "__main__":
@@ -143,9 +149,13 @@ if __name__ == "__main__":
                 color_print("\n[!] Server is ready to communicate\n", color="blue")
                 serverMsg = input("\n[>]Enter your name: ")
                 server.send(serverMsg.encode())
-                threading_rec = threading.Thread(target=ReceiveMessage())
+                threading_send = threading.Thread(target=SendMessage, args=[server, key_128])
+                threading_send.start()
+                threading_rec = threading.Thread(target=ReceiveMessage, args=[server, key_128])
                 threading_rec.start()
-                threading_send = threading.Thread(target=SendMessage())
+                #threading_send = threading.Thread(target=SendMessage, args=[key_128])
+                #threading_send.start()
+
             else:
                 color_print("\nServer (Public key && Public key hash) || (Session key && Hash of Session key) doesn't match", color="red", underline=True)
 
